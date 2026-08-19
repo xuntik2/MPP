@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block title %}Одобренные мемы{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-check-circle-fill text-success"></i> Одобренные мемы</h2>
+        <div>
+            <button class="btn btn-primary me-2" onclick="compressAll()">
+                <i class="bi bi-file-earmark-zip"></i> Сжать все
+            </button>
+            <button class="btn btn-success" onclick="sendDigest()">
+                <i class="bi bi-envelope"></i> Отправить подборку
+            </button>
+        </div>
+    </div>
+
+    {% if memes %}
+    <div class="row row-cols-1 row-cols-md-3 row-cols-lg-4 g-4" id="memes-grid">
+        {% for meme in memes %}
+        <div class="col" id="meme-{{ meme.id }}">
+            <div class="card h-100 shadow-sm">
+                <img src="{{ meme.file_path }}" class="card-img-top" alt="Meme" style="height: 200px; object-fit: cover;">
+                <div class="card-body">
+                    <h6 class="card-title text-capitalize">{{ meme.section }}</h6>
+                    <p class="card-text small text-muted">{{ meme.text[:50] }}...</p>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <small class="text-muted">{{ meme.popularity or 0 }} 👍</small>
+                        {% if meme.compressed_path %}
+                        <span class="badge bg-success">Сжат</span>
+                        {% else %}
+                        <button class="btn btn-sm btn-outline-primary" onclick="compressMeme({{ meme.id }})">
+                            <i class="bi bi-compress"></i>
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="card-footer bg-transparent border-top-0">
+                    <small class="text-muted">{{ meme.fetched_at.strftime('%d.%m.%Y %H:%M') }}</small>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i> Нет одобренных мемов. Перейдите на главную страницу для модерации.
+    </div>
+    {% endif %}
+</div>
+
+<script>
+async function compressMeme(memeId) {
+    const btn = event.target.closest('button');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+    
+    try {
+        const response = await fetch(`/api/meme/${memeId}/compress`, { method: 'POST' });
+        const result = await response.json();
+        
+        if (response.ok) {
+            // Обновляем карточку
+            const card = document.getElementById(`meme-${memeId}`);
+            const badge = card.querySelector('.badge');
+            badge.className = 'badge bg-success';
+            badge.textContent = 'Сжат';
+            btn.remove();
+            
+            alert(`Сжато: ${result.details.original_kb}KB → ${result.details.compressed_kb}KB (${result.details.reduction_percent}% экономии)`);
+        } else {
+            alert('Ошибка сжатия: ' + result.detail);
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-compress"></i>';
+        }
+    } catch (error) {
+        alert('Ошибка сети: ' + error);
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-compress"></i>';
+    }
+}
+
+async function compressAll() {
+    if (!confirm('Сжать все одобренные мемы?')) return;
+    
+    const cards = document.querySelectorAll('#memes-grid .col');
+    for (const card of cards) {
+        const memeId = card.id.replace('meme-', '');
+        const btn = card.querySelector('button');
+        if (btn && !btn.disabled) {
+            await compressMeme(memeId);
+            await new Promise(r => setTimeout(r, 300)); // Небольшая задержка между запросами
+        }
+    }
+}
+
+async function sendDigest() {
+    if (!confirm('Отправить подборку одобренных мемов на почту?')) return;
+    
+    const btn = event.target;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Отправка...';
+    
+    try {
+        const response = await fetch('/api/send-digest', { method: 'POST' });
+        const result = await response.json();
+        
+        if (response.ok) {
+            alert(`Подборка отправлена! Мемов: ${result.count}`);
+            // Помечаем все как отправленные
+            document.querySelectorAll('.badge.bg-success').forEach(badge => {
+                badge.className = 'badge bg-info';
+                badge.textContent = 'Отправлен';
+            });
+        } else {
+            alert('Ошибка отправки: ' + result.detail);
+        }
+    } catch (error) {
+        alert('Ошибка сети: ' + error);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-envelope"></i> Отправить подборку';
+    }
+}
+</script>
+{% endblock %}
