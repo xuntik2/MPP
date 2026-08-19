@@ -1,162 +1,50 @@
-{% extends "base.html" %}
-{% block content %}
-<div class="alert alert-info d-flex align-items-center" role="alert">
-    <div>
-        <h4 class="alert-heading">👋 Добро пожаловать в МемоСбор!</h4>
-        <p class="mb-0">Это локальный хаб для модерации мемов. Перейдите в <a href="/settings" class="alert-link fw-bold">Настройки</a>, чтобы указать API-ключи и запустить первый сбор.</p>
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>МемоСбор - Дашборд</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-dark text-white">
+<div class="container mt-5">
+    <h1>🚀 МемоСбор</h1>
+    <div class="btn-group mb-4">
+        <a href="/collect" class="btn btn-primary" onclick="startCollect(event)">Собрать сейчас</a>
+        <a href="/memos" class="btn btn-warning">Модерация</a>
+        <a href="/logs" class="btn btn-info">Логи</a>
+        <button class="btn btn-success" onclick="sendMail()">Отправить подборку</button>
     </div>
-</div>
-
-<!-- Статистика -->
-<div class="row g-4 mb-4">
-    <div class="col-md-3">
-        <div class="card text-bg-dark border-secondary h-100">
-            <div class="card-body text-center">
-                <h5 class="card-title text-muted">📥 Всего мемов</h5>
-                <p class="card-text display-4">{{ total_memes or 0 }}</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card text-bg-primary h-100">
-            <div class="card-body text-center">
-                <h5 class="card-title">🆕 Новые</h5>
-                <p class="card-text display-4">{{ new_memes or 0 }}</p>
-                <a href="/memos?status=new" class="btn btn-sm btn-light mt-2">Посмотреть</a>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card text-bg-success h-100">
-            <div class="card-body text-center">
-                <h5 class="card-title">✅ Одобрено</h5>
-                <p class="card-text display-4">{{ approved_memes or 0 }}</p>
-                <a href="/memos?status=approved" class="btn btn-sm btn-light mt-2">Посмотреть</a>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card text-bg-warning h-100">
-            <div class="card-body text-center">
-                <h5 class="card-title text-dark">🗑️ Отклонено</h5>
-                <p class="card-text display-4">{{ rejected_memes or 0 }}</p>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Кнопки действий -->
-<div class="row g-4 mb-4">
-    <div class="col-md-6">
-        <div class="card h-100">
-            <div class="card-body text-center">
-                <h5 class="card-title">⚡ Быстрые действия</h5>
-                <div class="d-grid gap-2 mt-3">
-                    <button class="btn btn-primary btn-lg" id="collectBtn" onclick="startCollection()">
-                        <i class="bi bi-cloud-download"></i> Собрать мемы сейчас
-                    </button>
-                    <a href="/memos?status=new" class="btn btn-outline-primary btn-lg">
-                        <i class="bi bi-images"></i> Модерация мемов
-                    </a>
-                    <a href="/logs" class="btn btn-outline-secondary">
-                        <i class="bi bi-journal-text"></i> Просмотр логов
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
+    <div id="status" class="alert alert-secondary">Ожидание...</div>
     
-    <div class="col-md-6">
-        <div class="card h-100">
-            <div class="card-header bg-dark text-white">
-                <h5 class="mb-0">📊 Последние запуски</h5>
-            </div>
-            <div class="card-body">
-                {% if last_runs %}
-                <div class="table-responsive">
-                    <table class="table table-sm table-striped">
-                        <thead>
-                            <tr>
-                                <th>Дата</th>
-                                <th>Источник</th>
-                                <th>Найдено</th>
-                                <th>Статус</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for run in last_runs %}
-                            <tr>
-                                <td>{{ run.started_at.strftime('%d.%m %H:%M') if run.started_at else '-' }}</td>
-                                <td>{{ run.source or 'Все' }}</td>
-                                <td><span class="badge bg-info">{{ run.found or 0 }}</span></td>
-                                <td>
-                                    {% if run.error %}
-                                        <span class="badge bg-danger">Ошибка</span>
-                                    {% else %}
-                                        <span class="badge bg-success">OK</span>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+    <h3>Последние мемы</h3>
+    <div class="row">
+        {% for meme in memes %}
+        <div class="col-md-3 mb-3">
+            <div class="card bg-secondary text-white">
+                <img src="{{ meme.file_path }}" class="card-img-top" alt="Meme">
+                <div class="card-body">
+                    <p class="card-text">{{ meme.text[:30] }}...</p>
+                    <span class="badge {{ 'bg-success' if meme.status=='approved' else 'bg-warning' }}">{{ meme.status }}</span>
                 </div>
-                <div class="text-center mt-3">
-                    <a href="/logs" class="btn btn-sm btn-outline-secondary">Все логи →</a>
-                </div>
-                {% else %}
-                <div class="text-center py-5 text-muted">
-                    <i class="bi bi-inbox" style="font-size: 3rem;"></i>
-                    <p class="mt-3">Запусков пока не было</p>
-                    <p>Нажмите "Собрать мемы сейчас" для первого запуска</p>
-                </div>
-                {% endif %}
             </div>
         </div>
+        {% endfor %}
     </div>
-</div>
-
-<!-- Статус сбора -->
-<div id="collectionStatus" class="alert alert-dismissible fade show" style="display:none;" role="alert">
-    <span id="statusMessage"></span>
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
 </div>
 
 <script>
-async function startCollection() {
-    const btn = document.getElementById('collectBtn');
-    const statusDiv = document.getElementById('collectionStatus');
-    const statusMsg = document.getElementById('statusMessage');
-    
-    btn.disabled = true;
-    btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Сбор запущен...';
-    
-    try {
-        const response = await fetch('/collect', { method: 'POST' });
-        const data = await response.json();
-        
-        statusDiv.style.display = 'block';
-        statusDiv.className = 'alert alert-' + (data.status === 'started' ? 'info' : 'danger') + ' alert-dismissible fade show';
-        statusMsg.textContent = data.message || 'Произошла ошибка';
-        
-        if (data.status === 'started') {
-            btn.innerHTML = '<i class="bi bi-check-circle"></i> Сбор завершён!';
-            btn.classList.remove('btn-primary');
-            btn.classList.add('btn-success');
-            
-            // Обновление страницы через 3 секунды
-            setTimeout(() => location.reload(), 3000);
-        } else {
-            btn.disabled = false;
-            btn.innerHTML = '<i class="bi bi-cloud-download"></i> Собрать мемы сейчас';
-        }
-    } catch (e) {
-        statusDiv.style.display = 'block';
-        statusDiv.className = 'alert alert-danger alert-dismissible fade show';
-        statusMsg.textContent = 'Ошибка сети: ' + e.message;
-        btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-cloud-download"></i> Собрать мемы сейчас';
-    }
+async function startCollect(e) {
+    e.preventDefault();
+    document.getElementById('status').innerText = "Запуск сбора...";
+    const res = await fetch('/collect', {method: 'POST'});
+    const data = await res.json();
+    document.getElementById('status').innerText = data.message;
+}
+async function sendMail() {
+    const res = await fetch('/send-mail', {method: 'POST'});
+    const data = await res.json();
+    alert(data.status === 'sent' ? 'Отправлено!' : 'Ошибка или пусто');
 }
 </script>
-{% endblock %}
+</body>
+</html>
