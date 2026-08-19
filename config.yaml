@@ -1,8 +1,8 @@
 vk:
-  service_token: "" # ВСТАВЬТЕ_СЕРВИСНЫЙ_КЛЮЧ_VK
+  service_token: "" # ВСТАВЬТЕ_СЕРВИСНЫЙ_КЛЮЧ_VK (vk.com/dev)
   communities: [off_plankton, tproger, borsch, lentach]
 telegram:
-  api_id: 0 
+  api_id: 0 # my.telegram.org
   api_hash: ""
   channels: [th_21st, office_plankton, it_humor, reklamaplacit, dvach, topor, kb_tg]
 parsers:
