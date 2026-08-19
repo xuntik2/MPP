@@ -1,228 +1,290 @@
 import logging
 import logging.config
-from fastapi import FastAPI, Request, Form, BackgroundTasks, HTTPException
+from pathlib import Path
+from typing import List, Optional
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI, Request, Form, BackgroundTasks, HTTPException, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from sqlalchemy.orm import Session
+from sqlalchemy import desc
 import yaml
 import os
 
-from .database import engine, Base
+# Импорт локальных модулей
+from .database import engine, Base, get_db, init_db
 from . import models
-from .services.collector import Collector
+from .models import Meme, RunLog, Setting
+from .config_loader import load_config
 from .parsers.vk_parser import VKParser
 from .parsers.pikabu_parser import PikabuParser
 from .parsers.joyreactor_parser import JoyReactorParser
 from .parsers.dvach_parser import DvachParser
 
-# Настройка логирования
-LOGGING_CONFIG = "logging.conf"
-if os.path.exists(LOGGING_CONFIG):
-    logging.config.fileConfig(LOGGING_CONFIG, disable_existing_loggers=False)
+from .services.collector import Collector
+from .services.compressor import ImageCompressor
+from .services.mailer import MailerService
+from .services.scheduler import SchedulerService
 
-logger = logging.getLogger("app")
+# --- Конфигурация логирования ---
+LOG_DIR = Path("data")
+LOG_DIR.mkdir(exist_ok=True)
+LOG_FILE = LOG_DIR / "app.log"
 
-app = FastAPI(title="МемоСбор")
+# Простая конфигурация, если файл logging.conf отсутствует
+if not Path("logging.conf").exists():
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        handlers=[
+            logging.FileHandler(LOG_FILE, encoding='utf-8'),
+            logging.StreamHandler()
+        ]
+    )
+else:
+    logging.config.fileConfig("logging.conf", disable_existing_loggers=False)
 
-# Создание таблиц при старте
-Base.metadata.create_all(bind=engine)
+logger = logging.getLogger(__name__)
+
+# --- Глобальные переменные ---
+config = {}
+scheduler_service = None
+collector_service = None
+compressor_service = None
+mailer_service = None
+
+# --- Инициализация при старте приложения ---
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global config, scheduler_service, collector_service, compressor_service, mailer_service
+    
+    logger.info("Starting MemoSbor application...")
+    
+    # 1. Загрузка конфига
+    config = load_config()
+    logger.info("Configuration loaded successfully.")
+    
+    # 2. Инициализация БД
+    init_db()
+    logger.info("Database initialized.")
+    
+    # 3. Инициализация сервисов
+    compress_cfg = config.get("compress", {})
+    compressor_service = ImageCompressor(
+        target_kb=compress_cfg.get("target_kb", 150),
+        min_quality=compress_cfg.get("min_quality", 60),
+        min_dimension=compress_cfg.get("min_dimension", 800)
+    )
+    
+    if config.get("mail", {}).get("enabled", False):
+        mailer_service = MailerService(config.get("mail", {}))
+        logger.info("Mailer service initialized.")
+    else:
+        logger.info("Mailer service disabled in config.")
+        
+    collector_service = Collector(config, db_func=get_db)
+    
+    # 4. Запуск планировщика
+    scheduler_service = SchedulerService()
+    schedule_times = config.get("schedule", [])
+    if schedule_times:
+        # Передаем функцию сбора как задачу
+        scheduler_service.add_job(run_collection_task, schedule_times)
+        logger.info(f"Scheduled collection tasks: {schedule_times}")
+    else:
+        logger.info("No scheduled tasks configured.")
+
+    yield
+    
+    # Shutdown
+    logger.info("Shutting down application...")
+    if scheduler_service:
+        scheduler_service.shutdown()
+
+# --- Фоновая задача для планировщика ---
+def run_collection_task():
+    """Обертка для запуска коллектора из планировщика (синхронный вызов)."""
+    try:
+        logger.info("Scheduler triggered collection task.")
+        # Создаем новую сессию БД для фонового процесса
+        from .database import SessionLocal
+        db = SessionLocal()
+        try:
+            collector = Collector(config, db_func=lambda: db)
+            stats = collector.run_all()
+            logger.info(f"Collection finished: {stats}")
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"Error in scheduled collection task: {e}", exc_info=True)
+
+# --- Создание приложения FastAPI ---
+app = FastAPI(title="МемоСбор", description="Парсер мемов с модерацией", lifespan=lifespan)
 
 # Статика и шаблоны
-os.makedirs("app/static", exist_ok=True)
-os.makedirs("data", exist_ok=True)
-app.mount("/static", StaticFiles(directory="app/static"), name="static")
-templates = Jinja2Templates(directory="app/templates")
+BASE_DIR = Path(__file__).resolve().parent
+static_path = BASE_DIR / "static"
+templates_path = BASE_DIR / "templates"
+
+# Создаем папки, если нет
+static_path.mkdir(exist_ok=True)
+templates_path.mkdir(exist_ok=True)
+
+app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
+templates = Jinja2Templates(directory=str(templates_path))
 
 CONFIG_PATH = "config.yaml"
 
-def load_config():
-    if not os.path.exists(CONFIG_PATH): 
-        logger.warning(f"Config file {CONFIG_PATH} not found, using defaults")
-        return {}
-    with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
-        config = yaml.safe_load(f) or {}
-        logger.info("Configuration loaded successfully")
-        return config
+def get_collector():
+    if not collector_service:
+        raise HTTPException(status_code=503, detail="Collector service not initialized")
+    return collector_service
 
-def save_config(data):
-    with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
-        yaml.dump(data, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
-    logger.info("Configuration saved")
+# --- Роуты (Web Interface) ---
 
 @app.get("/", response_class=HTMLResponse)
-async def dashboard(request: Request):
-    # Получаем статистику из БД
-    from sqlalchemy.orm import Session
-    from .database import get_db
-    from .models import Meme, RunLog
+async def dashboard(request: Request, db: Session = Depends(get_db)):
+    """Главная страница - Галерея новых мемов."""
+    memes = db.query(Meme).filter(Meme.status == "new").order_by(desc(Meme.fetched_at)).limit(50).all()
     
-    db = next(get_db())
-    total_memes = db.query(Meme).count()
-    new_memes = db.query(Meme).filter(Meme.status == "new").count()
-    approved_memes = db.query(Meme).filter(Meme.status == "approved").count()
-    rejected_memes = db.query(Meme).filter(Meme.status == "rejected").count()
+    # Статистика
+    total_new = db.query(Meme).filter(Meme.status == "new").count()
+    total_approved = db.query(Meme).filter(Meme.status == "approved").count()
+    total_rejected = db.query(Meme).filter(Meme.status == "rejected").count()
     
-    # Последние логи
-    last_runs = db.query(RunLog).order_by(RunLog.started_at.desc()).limit(5).all()
-    
-    db.close()
+    last_run = db.query(RunLog).order_by(desc(RunLog.id)).first()
     
     return templates.TemplateResponse("dashboard.html", {
-        "request": request, 
-        "title": "Дашборд",
-        "total_memes": total_memes,
-        "new_memes": new_memes,
-        "approved_memes": approved_memes,
-        "rejected_memes": rejected_memes,
-        "last_runs": last_runs
+        "request": request,
+        "memes": memes,
+        "stats": {"new": total_new, "approved": total_approved, "rejected": total_rejected},
+        "last_run": last_run
+    })
+
+@app.get("/approved", response_class=HTMLResponse)
+async def approved_gallery(request: Request, db: Session = Depends(get_db)):
+    """Страница одобренных мемов (для сжатия и отправки)."""
+    memes = db.query(Meme).filter(Meme.status == "approved").order_by(desc(Meme.fetched_at)).all()
+    return templates.TemplateResponse("approved.html", {
+        "request": request,
+        "memes": memes
+    })
+
+@app.get("/logs", response_class=HTMLResponse)
+async def logs_page(request: Request, db: Session = Depends(get_db)):
+    """Страница логов запусков."""
+    logs = db.query(RunLog).order_by(desc(RunLog.id)).limit(20).all()
+    return templates.TemplateResponse("logs.html", {
+        "request": request,
+        "logs": logs
     })
 
 @app.get("/settings", response_class=HTMLResponse)
-async def settings_page(request: Request, saved: int = 0):
-    config = load_config()
+async def settings_page(request: Request):
+    """Страница настроек (конфиг)."""
     return templates.TemplateResponse("settings.html", {
-        "request": request, 
-        "config": config, 
-        "title": "Настройки API",
-        "saved": saved
-    })
-
-@app.post("/settings/save")
-async def save_settings(
-    vk_token: str = Form(""),
-    tg_api_id: str = Form("0"),
-    tg_api_hash: str = Form(""),
-    time_window: int = Form(24)
-):
-    config = load_config()
-    
-    # Обновление VK
-    if "vk" not in config: config["vk"] = {}
-    config["vk"]["service_token"] = vk_token
-    
-    # Обновление Telegram
-    if "telegram" not in config: config["telegram"] = {}
-    try:
-        config["telegram"]["api_id"] = int(tg_api_id)
-    except ValueError:
-        config["telegram"]["api_id"] = 0
-    config["telegram"]["api_hash"] = tg_api_hash
-    
-    config["time_window_hours"] = time_window
-    
-    save_config(config)
-    return RedirectResponse(url="/settings?saved=1", status_code=303)
-
-@app.post("/collect")
-async def collect_memes(background_tasks: BackgroundTasks):
-    """Запуск сбора мемов вручную"""
-    logger.info("Manual collection started")
-    
-    try:
-        config = load_config()
-        from .database import get_db
-        db = next(get_db())
-        collector = Collector(config, db)
-        
-        # Запускаем в фоне, чтобы не блокировать запрос
-        async def run_collection():
-            try:
-                result = await collector.run_all_parsers()
-                logger.info(f"Collection completed: {result}")
-                return JSONResponse({"status": "success", "result": result})
-            except Exception as e:
-                logger.error(f"Collection failed: {e}", exc_info=True)
-                return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
-        
-        background_tasks.add_task(run_collection)
-        
-        return JSONResponse({
-            "status": "started", 
-            "message": "Сбор мемов запущен в фоновом режиме"
-        })
-    except Exception as e:
-        logger.error(f"Failed to start collection: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/memos", response_class=HTMLResponse)
-async def memos_page(request: Request, status: str = "new", section: str = ""):
-    """Страница модерации мемов"""
-    from sqlalchemy.orm import Session
-    from .database import get_db
-    from .models import Meme
-    
-    db = next(get_db())
-    
-    query = db.query(Meme)
-    if status:
-        query = query.filter(Meme.status == status)
-    if section:
-        query = query.filter(Meme.section == section)
-    
-    memes = query.order_by(Meme.fetched_at.desc()).limit(50).all()
-    db.close()
-    
-    return templates.TemplateResponse("memos.html", {
         "request": request,
-        "title": "Модерация мемов",
-        "memes": memes,
-        "current_status": status,
-        "current_section": section
+        "config": config
     })
 
-@app.post("/memo/{meme_id}/approve")
-async def approve_meme(meme_id: int):
-    """Одобрить мем"""
-    from sqlalchemy.orm import Session
-    from .database import get_db
-    from .models import Meme
+# --- API Роуты (Actions) ---
+
+@app.post("/api/collect")
+async def trigger_collect(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """Запуск сбора мемов вручную."""
+    logger.info("Manual collection triggered via API.")
     
-    db = next(get_db())
+    # Запускаем в фоне, чтобы не блокировать UI
+    background_tasks.add_task(run_collection_task)
+    
+    return {"status": "started", "message": "Сбор мемов запущен в фоновом режиме."}
+
+@app.post("/api/meme/{meme_id}/approve")
+async def approve_meme(meme_id: int, db: Session = Depends(get_db)):
     meme = db.query(Meme).filter(Meme.id == meme_id).first()
     if not meme:
-        db.close()
-        raise HTTPException(status_code=404, detail="Мем не найден")
+        raise HTTPException(status_code=404, detail="Meme not found")
     
     meme.status = "approved"
     db.commit()
-    logger.info(f"Meme {meme_id} approved")
-    db.close()
-    
-    return JSONResponse({"status": "success", "message": "Мем одобрен"})
+    logger.info(f"Meme {meme_id} approved.")
+    return {"status": "ok"}
 
-@app.post("/memo/{meme_id}/reject")
-async def reject_meme(meme_id: int):
-    """Отклонить мем"""
-    from sqlalchemy.orm import Session
-    from .database import get_db
-    from .models import Meme
-    
-    db = next(get_db())
+@app.post("/api/meme/{meme_id}/reject")
+async def reject_meme(meme_id: int, db: Session = Depends(get_db)):
     meme = db.query(Meme).filter(Meme.id == meme_id).first()
     if not meme:
-        db.close()
-        raise HTTPException(status_code=404, detail="Мем не найден")
+        raise HTTPException(status_code=404, detail="Meme not found")
     
     meme.status = "rejected"
     db.commit()
-    logger.info(f"Meme {meme_id} rejected")
-    db.close()
-    
-    return JSONResponse({"status": "success", "message": "Мем отклонён"})
+    logger.info(f"Meme {meme_id} rejected.")
+    return {"status": "ok"}
 
-@app.get("/logs", response_class=HTMLResponse)
-async def logs_page(request: Request):
-    """Страница логов"""
-    from sqlalchemy.orm import Session
-    from .database import get_db
-    from .models import RunLog
+@app.post("/api/meme/{meme_id}/compress")
+async def compress_meme(meme_id: int, db: Session = Depends(get_db)):
+    if not compressor_service:
+        raise HTTPException(status_code=503, detail="Compressor not initialized")
+        
+    meme = db.query(Meme).filter(Meme.id == meme_id).first()
+    if not meme or not meme.file_path:
+        raise HTTPException(status_code=404, detail="Meme or file not found")
+        
+    if meme.status != "approved":
+        raise HTTPException(status_code=400, detail="Only approved memes can be compressed")
+        
+    # Путь к сжатому файлу
+    file_path = Path(meme.file_path)
+    output_path = file_path.parent / "compressed" / f"{file_path.stem}_webp{file_path.suffix}"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     
-    db = next(get_db())
-    logs = db.query(RunLog).order_by(RunLog.started_at.desc()).limit(20).all()
-    db.close()
+    result = compressor_service.compress(str(file_path), str(output_path))
     
-    return templates.TemplateResponse("logs.html", {
-        "request": request,
-        "title": "Логи запусков",
-        "logs": logs
-    })
+    if result.get("success"):
+        meme.compressed_path = str(output_path)
+        meme.status = "compressed"
+        db.commit()
+        logger.info(f"Meme {meme_id} compressed: {result['compressed_kb']}KB")
+        return {"status": "ok", "details": result}
+    else:
+        logger.error(f"Compression failed for {meme_id}: {result.get('error')}")
+        raise HTTPException(status_code=500, detail=result.get('error'))
+
+@app.post("/api/send-digest")
+async def send_digest(db: Session = Depends(get_db)):
+    if not mailer_service:
+        raise HTTPException(status_code=503, detail="Mailer service is disabled or not configured")
+        
+    # Берем все сжатые или одобренные (если сжатие не обязательно)
+    memes_to_send = db.query(Meme).filter(
+        (Meme.status == "compressed") | (Meme.status == "approved")
+    ).all()
+    
+    if not memes_to_send:
+        return {"status": "info", "message": "Нет мемов для отправки."}
+        
+    # Формируем список словарей для mailer
+    data = [
+        {
+            "id": m.id,
+            "section": m.section,
+            "file_path": m.compressed_path or m.file_path,
+            "text": m.text
+        }
+        for m in memes_to_send
+    ]
+    
+    success = mailer_service.send_digest(data)
+    
+    if success:
+        # Обновляем статус
+        for m in memes_to_send:
+            m.status = "sent"
+        db.commit()
+        logger.info("Digest email sent successfully.")
+        return {"status": "ok", "count": len(data)}
+    else:
+        logger.error("Failed to send digest email.")
+        raise HTTPException(status_code=500, detail="Failed to send email. Check logs.")

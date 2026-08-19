@@ -12,6 +12,10 @@ engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
+def init_db():
+    """Инициализация БД - создание таблиц"""
+    Base.metadata.create_all(bind=engine)
+
 def get_db():
     """Генератор сессий БД для зависимостей FastAPI"""
     db = SessionLocal()
