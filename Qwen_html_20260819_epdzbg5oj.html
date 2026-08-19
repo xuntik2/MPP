@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="alert alert-info d-flex align-items-center" role="alert">
+    <div>
+        <h4 class="alert-heading">👋 Добро пожаловать в МемоСбор!</h4>
+        <p class="mb-0">Это локальный хаб для модерации мемов. Перейдите в <a href="/settings" class="alert-link fw-bold">Настройки</a>, чтобы указать API-ключи и запустить первый сбор.</p>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-md-4">
+        <div class="card text-bg-dark border-secondary h-100">
+            <div class="card-body text-center">
+                <h5 class="card-title text-muted">📥 Новые мемы</h5>
+                <p class="card-text display-4">0</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-bg-success h-100">
+            <div class="card-body text-center">
+                <h5 class="card-title">✅ Одобрено</h5>
+                <p class="card-text display-4">0</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-bg-warning h-100">
+            <div class="card-body text-center">
+                <h5 class="card-title text-dark">🗑️ Отклонено</h5>
+                <p class="card-text display-4">0</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="d-grid gap-2">
+    <button class="btn btn-primary btn-lg" disabled>🚀 Собрать мемы сейчас (Требуется настройка API)</button>
+</div>
+{% endblock %}

@@ -1,0 +1,29 @@
+vk:
+  service_token: "" # ВСТАВЬТЕ_СЕРВИСНЫЙ_КЛЮЧ_VK
+  communities: [off_plankton, tproger, borsch, lentach]
+telegram:
+  api_id: 0 
+  api_hash: ""
+  channels: [th_21st, office_plankton, it_humor, reklamaplacit, dvach, topor, kb_tg]
+parsers:
+  pikabu: true
+  joyreactor: true
+  dvach: false
+thresholds:
+  vk: 200
+  pikabu: 100
+  joyreactor: 50
+  telegram: 1000
+time_window_hours: 24
+schedule: ["09:20", "14:20", "19:20"]
+mail:
+  enabled: false
+  smtp_host: smtp.yandex.ru
+  smtp_port: 465
+  login: ""
+  password: ""
+  recipients: []
+compress:
+  target_kb: 150
+  min_quality: 60
+  min_dimension: 800

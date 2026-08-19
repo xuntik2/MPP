@@ -1,0 +1,33 @@
+@echo off
+chcp 65001 >nul
+echo ==========================================
+echo        МемоСбор - Инициализация...
+echo ==========================================
+
+if not exist "venv" (
+    echo [1/4] Создание виртуального окружения...
+    python -m venv venv
+)
+
+call venv\Scripts\activate
+
+echo [2/4] Установка зависимостей (может занять пару минут)...
+pip install -r requirements.txt -q
+
+echo [3/4] Создание структуры папок для мемов...
+if not exist "data\memes\office" mkdir "data\memes\office"
+if not exist "data\memes\it" mkdir "data\memes\it"
+if not exist "data\memes\mass" mkdir "data\memes\mass"
+if not exist "data\memes\dark" mkdir "data\memes\dark"
+if not exist "data\memes\news" mkdir "data\memes\news"
+
+echo [4/4] Запуск веб-сервера...
+echo.
+echo ------------------------------------------
+echo  Сервер запущен! Откройте в браузере:
+echo  http://127.0.0.1:8000
+echo ------------------------------------------
+echo.
+start http://127.0.0.1:8000
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+pause

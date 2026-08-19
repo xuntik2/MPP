@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 class="mb-4">⚙️ Настройки API и Парсеров</h2>
+<p class="text-muted lead">Здесь вы можете указать ключи для работы парсеров. Без них сбор мемов из VK и Telegram невозможен.</p>
+
+<form method="post" action="/settings/save">
+    <div class="card mb-4 border-primary">
+        <div class="card-header bg-primary text-white">ВКонтакте (VK API)</div>
+        <div class="card-body">
+            <div class="hint-box">
+                👉 <strong>Где взять ключ?</strong><br>
+                1. Зайдите на <a href="https://vk.com/dev" target="_blank" class="text-warning">vk.com/dev</a><br>
+                2. Создайте приложение (Тип: "Сайт" или "Standalone").<br>
+                3. Скопируйте <strong>Сервисный ключ</strong> (Service Token) и вставьте ниже.
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-bold">Сервисный ключ (Service Token)</label>
+                <input type="password" class="form-control form-control-lg" name="vk_token" value="{{ config.vk.service_token or '' }}" placeholder="Вставьте ключ сюда...">
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4 border-info">
+        <div class="card-header bg-info text-dark">Telegram (MTProto)</div>
+        <div class="card-body">
+            <div class="hint-box">
+                👉 <strong>Где взять API ID и Hash?</strong><br>
+                1. Зайдите на <a href="https://my.telegram.org" target="_blank" class="text-warning">my.telegram.org</a><br>
+                2. Войдите по номеру телефона -> "API development tools".<br>
+                3. Создайте приложение и скопируйте <code>App api_id</code> (число) и <code>App api_hash</code> (строка).
+            </div>
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label fw-bold">API ID (число)</label>
+                    <input type="text" class="form-control form-control-lg" name="tg_api_id" value="{{ config.telegram.api_id or '' }}">
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label fw-bold">API Hash (строка)</label>
+                    <input type="password" class="form-control form-control-lg" name="tg_api_hash" value="{{ config.telegram.api_hash or '' }}">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4 border-secondary">
+        <div class="card-header bg-secondary">Общие настройки</div>
+        <div class="card-body">
+            <div class="mb-3">
+                <label class="form-label fw-bold">Окно сбора (часов)</label>
+                <input type="number" class="form-control" name="time_window" value="{{ config.time_window_hours or 24 }}">
+                <div class="form-text">Собирать посты, опубликованные не ранее чем N часов назад.</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-grid gap-2 col-6 mx-auto">
+        <button type="submit" class="btn btn-success btn-lg">💾 Сохранить и Применить</button>
+    </div>
+</form>
+{% endblock %}
