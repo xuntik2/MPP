@@ -1,6 +1,7 @@
 import logging
 import logging.config
 from pathlib import Path
+from datetime import datetime
 from typing import List, Optional
 from contextlib import asynccontextmanager
 
@@ -9,7 +10,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
-from sqlalchemy import desc
+from sqlalchemy import desc, text
 
 # Импорт локальных модулей (Относительные импорты для пакета app)
 from .database import engine, Base, get_db, init_db, SessionLocal
@@ -82,7 +83,7 @@ async def lifespan(app: FastAPI):
     else:
         logger.info("Mailer service disabled in config.")
         
-    collector_service = Collector(config, db_func=get_db)
+    collector_service = Collector(config, SessionLocal())
     
     # 4. Запуск планировщика
     scheduler_service = SchedulerService()
@@ -107,7 +108,7 @@ def run_collection_task():
         logger.info("Scheduler triggered collection task.")
         db = SessionLocal()
         try:
-            collector = Collector(config, db_func=lambda: db)
+            collector = Collector(config, db)
             stats = collector.run_all()
             logger.info(f"Collection finished: {stats}")
         finally:
@@ -177,6 +178,153 @@ async def settings_page(request: Request):
     })
 
 # --- API Роуты (Actions) ---
+
+@app.get("/health")
+async def health_check(db: Session = Depends(get_db)):
+    """
+    Health check endpoint для мониторинга доступности сервиса и источников.
+    Возвращает статус компонентов приложения.
+    """
+    health_status = {
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat(),
+        "components": {
+            "database": {"status": "unknown", "latency_ms": None},
+            "vk_api": {"status": "unknown", "message": "Token not configured"},
+            "parsers": {"status": "unknown", "active": 0, "total": 0},
+            "scheduler": {"status": "unknown", "jobs_count": 0},
+            "compressor": {"status": "unknown"},
+            "mailer": {"status": "unknown"}
+        }
+    }
+    
+    # Проверка БД
+    try:
+        start_time = datetime.now()
+        db.execute(text("SELECT 1"))
+        latency = (datetime.now() - start_time).total_seconds() * 1000
+        health_status["components"]["database"] = {
+            "status": "healthy",
+            "latency_ms": round(latency, 2)
+        }
+    except Exception as e:
+        health_status["components"]["database"] = {
+            "status": "unhealthy",
+            "error": str(e)
+        }
+        health_status["status"] = "degraded"
+    
+    # Проверка VK API конфигурации
+    if config.get("vk", {}).get("service_token"):
+        health_status["components"]["vk_api"] = {
+            "status": "configured",
+            "communities_count": len(config.get("vk", {}).get("communities", []))
+        }
+    else:
+        health_status["components"]["vk_api"] = {
+            "status": "not_configured",
+            "message": "VK service token is missing"
+        }
+    
+    # Проверка парсеров
+    active_parsers = sum([
+        1 if config.get("vk", {}).get("service_token") else 0,
+        1 if config.get("parsers", {}).get("pikabu", True) else 0,
+        1 if config.get("parsers", {}).get("joyreactor", True) else 0,
+        1 if config.get("parsers", {}).get("dvach", False) else 0
+    ])
+    health_status["components"]["parsers"] = {
+        "status": "healthy" if active_parsers > 0 else "no_active",
+        "active": active_parsers,
+        "total": 4,
+        "sources": {
+            "vk": bool(config.get("vk", {}).get("service_token")),
+            "pikabu": config.get("parsers", {}).get("pikabu", True),
+            "joyreactor": config.get("parsers", {}).get("joyreactor", True),
+            "dvach": config.get("parsers", {}).get("dvach", False)
+        }
+    }
+    
+    # Проверка планировщика
+    if scheduler_service:
+        jobs_count = len(scheduler_service.scheduler.get_jobs())
+        health_status["components"]["scheduler"] = {
+            "status": "healthy" if jobs_count > 0 else "no_jobs",
+            "jobs_count": jobs_count
+        }
+    else:
+        health_status["components"]["scheduler"] = {
+            "status": "not_initialized"
+        }
+    
+    # Проверка компрессора
+    if compressor_service:
+        health_status["components"]["compressor"] = {
+            "status": "ready",
+            "config": {
+                "target_kb": compressor_service.target_kb,
+                "min_quality": compressor_service.min_quality
+            }
+        }
+    else:
+        health_status["components"]["compressor"] = {
+            "status": "not_initialized"
+        }
+    
+    # Проверка mailer
+    if mailer_service and mailer_service.enabled:
+        health_status["components"]["mailer"] = {
+            "status": "configured",
+            "smtp_host": mailer_service.host,
+            "recipients_count": len(mailer_service.recipients)
+        }
+    elif mailer_service:
+        health_status["components"]["mailer"] = {
+            "status": "disabled",
+            "message": "Mailer is disabled in config"
+        }
+    else:
+        health_status["components"]["mailer"] = {
+            "status": "not_initialized"
+        }
+    
+    # Определение общего статуса
+    db_status = health_status["components"]["database"]["status"]
+    if db_status == "unhealthy":
+        health_status["status"] = "unhealthy"
+        return JSONResponse(status_code=503, content=health_status)
+    
+    parser_status = health_status["components"]["parsers"]["status"]
+    if parser_status == "no_active":
+        health_status["status"] = "degraded"
+    
+    return JSONResponse(content=health_status)
+
+
+@app.get("/health/ready")
+async def readiness_check(db: Session = Depends(get_db)):
+    """
+    Readiness probe - проверяет готовность приложения принимать запросы.
+    Используется Kubernetes-style readiness probes.
+    """
+    try:
+        # Быстрая проверка БД
+        db.execute(text("SELECT 1"))
+        return JSONResponse(content={"status": "ready"})
+    except Exception as e:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "not_ready", "reason": str(e)}
+        )
+
+
+@app.get("/health/live")
+async def liveness_check():
+    """
+    Liveness probe - простая проверка что приложение живо.
+    Используется Kubernetes-style liveness probes.
+    """
+    return JSONResponse(content={"status": "alive"})
 
 @app.post("/api/collect")
 async def trigger_collect(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
