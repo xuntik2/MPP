@@ -1,0 +1,58 @@
+2026-08-20 06:21:03 - app.main - INFO - Starting MemoSbor application...\nFile: /workspace/app/main.py, Line: 61
+2026-08-20 06:21:03 - app.config_loader - INFO - Configuration loaded successfully\nFile: /workspace/app/config_loader.py, Line: 18
+2026-08-20 06:21:03 - app.main - INFO - Configuration loaded successfully.\nFile: /workspace/app/main.py, Line: 65
+2026-08-20 06:21:03 - app.main - INFO - Database initialized.\nFile: /workspace/app/main.py, Line: 69
+2026-08-20 06:21:03 - app.main - INFO - Mailer service disabled in config.\nFile: /workspace/app/main.py, Line: 83
+2026-08-20 06:21:17 - app.main - INFO - Starting MemoSbor application...\nFile: /workspace/app/main.py, Line: 61
+2026-08-20 06:21:17 - app.config_loader - INFO - Configuration loaded successfully\nFile: /workspace/app/config_loader.py, Line: 18
+2026-08-20 06:21:17 - app.main - INFO - Configuration loaded successfully.\nFile: /workspace/app/main.py, Line: 65
+2026-08-20 06:21:17 - app.main - INFO - Database initialized.\nFile: /workspace/app/main.py, Line: 69
+2026-08-20 06:21:17 - app.main - INFO - Mailer service disabled in config.\nFile: /workspace/app/main.py, Line: 83
+2026-08-20 06:21:17 - app.services.collector - INFO - Инициализировано парсеров: 2\nFile: /workspace/app/services/collector.py, Line: 79
+2026-08-20 06:21:17 - apscheduler.scheduler - INFO - Scheduler started\nFile: /usr/local/lib/python3.12/site-packages/apscheduler/schedulers/base.py, Line: 181
+2026-08-20 06:21:17 - app.services.scheduler - INFO - SchedulerService started successfully.\nFile: /workspace/app/services/scheduler.py, Line: 17
+2026-08-20 06:21:17 - apscheduler.scheduler - INFO - Added job "Collection at 09:20" to job store "default"\nFile: /usr/local/lib/python3.12/site-packages/apscheduler/schedulers/base.py, Line: 895
+2026-08-20 06:21:17 - app.services.scheduler - INFO - Scheduled job 'daily_09_20' to run at 09:20\nFile: /workspace/app/services/scheduler.py, Line: 39
+2026-08-20 06:21:17 - apscheduler.scheduler - INFO - Added job "Collection at 14:20" to job store "default"\nFile: /usr/local/lib/python3.12/site-packages/apscheduler/schedulers/base.py, Line: 895
+2026-08-20 06:21:17 - app.services.scheduler - INFO - Scheduled job 'daily_14_20' to run at 14:20\nFile: /workspace/app/services/scheduler.py, Line: 39
+2026-08-20 06:21:17 - apscheduler.scheduler - INFO - Added job "Collection at 19:20" to job store "default"\nFile: /usr/local/lib/python3.12/site-packages/apscheduler/schedulers/base.py, Line: 895
+2026-08-20 06:21:17 - app.services.scheduler - INFO - Scheduled job 'daily_19_20' to run at 19:20\nFile: /workspace/app/services/scheduler.py, Line: 39
+2026-08-20 06:21:17 - app.main - INFO - Scheduled collection tasks: ['09:20', '14:20', '19:20']\nFile: /workspace/app/main.py, Line: 92
+2026-08-20 06:21:29 - app.main - INFO - Shutting down application...\nFile: /workspace/app/main.py, Line: 99
+2026-08-20 06:21:29 - app.services.scheduler - INFO - Shutting down scheduler...\nFile: /workspace/app/services/scheduler.py, Line: 53
+2026-08-20 06:21:29 - apscheduler.scheduler - INFO - Scheduler has been shut down\nFile: /usr/local/lib/python3.12/site-packages/apscheduler/schedulers/base.py, Line: 212
+2026-08-20 06:21:29 - app.services.scheduler - INFO - Scheduler stopped.\nFile: /workspace/app/services/scheduler.py, Line: 55
+2026-08-20 06:21:31 - app.main - INFO - Starting MemoSbor application...\nFile: /workspace/app/main.py, Line: 62
+2026-08-20 06:21:31 - app.config_loader - INFO - Configuration loaded successfully\nFile: /workspace/app/config_loader.py, Line: 18
+2026-08-20 06:21:31 - app.main - INFO - Configuration loaded successfully.\nFile: /workspace/app/main.py, Line: 66
+2026-08-20 06:21:31 - app.main - INFO - Database initialized.\nFile: /workspace/app/main.py, Line: 70
+2026-08-20 06:21:31 - app.main - INFO - Mailer service disabled in config.\nFile: /workspace/app/main.py, Line: 84
+2026-08-20 06:21:31 - app.services.collector - INFO - Инициализировано парсеров: 2\nFile: /workspace/app/services/collector.py, Line: 79
+2026-08-20 06:21:31 - apscheduler.scheduler - INFO - Scheduler started\nFile: /usr/local/lib/python3.12/site-packages/apscheduler/schedulers/base.py, Line: 181
+2026-08-20 06:21:31 - app.services.scheduler - INFO - SchedulerService started successfully.\nFile: /workspace/app/services/scheduler.py, Line: 17
+2026-08-20 06:21:31 - apscheduler.scheduler - INFO - Added job "Collection at 09:20" to job store "default"\nFile: /usr/local/lib/python3.12/site-packages/apscheduler/schedulers/base.py, Line: 895
+2026-08-20 06:21:31 - app.services.scheduler - INFO - Scheduled job 'daily_09_20' to run at 09:20\nFile: /workspace/app/services/scheduler.py, Line: 39
+2026-08-20 06:21:31 - apscheduler.scheduler - INFO - Added job "Collection at 14:20" to job store "default"\nFile: /usr/local/lib/python3.12/site-packages/apscheduler/schedulers/base.py, Line: 895
+2026-08-20 06:21:31 - app.services.scheduler - INFO - Scheduled job 'daily_14_20' to run at 14:20\nFile: /workspace/app/services/scheduler.py, Line: 39
+2026-08-20 06:21:31 - apscheduler.scheduler - INFO - Added job "Collection at 19:20" to job store "default"\nFile: /usr/local/lib/python3.12/site-packages/apscheduler/schedulers/base.py, Line: 895
+2026-08-20 06:21:31 - app.services.scheduler - INFO - Scheduled job 'daily_19_20' to run at 19:20\nFile: /workspace/app/services/scheduler.py, Line: 39
+2026-08-20 06:21:31 - app.main - INFO - Scheduled collection tasks: ['09:20', '14:20', '19:20']\nFile: /workspace/app/main.py, Line: 93
+2026-08-20 06:21:39 - app.main - INFO - Shutting down application...\nFile: /workspace/app/main.py, Line: 100
+2026-08-20 06:21:39 - app.services.scheduler - INFO - Shutting down scheduler...\nFile: /workspace/app/services/scheduler.py, Line: 53
+2026-08-20 06:21:39 - apscheduler.scheduler - INFO - Scheduler has been shut down\nFile: /usr/local/lib/python3.12/site-packages/apscheduler/schedulers/base.py, Line: 212
+2026-08-20 06:21:39 - app.services.scheduler - INFO - Scheduler stopped.\nFile: /workspace/app/services/scheduler.py, Line: 55
+2026-08-20 06:21:41 - app.main - INFO - Starting MemoSbor application...\nFile: /workspace/app/main.py, Line: 62
+2026-08-20 06:21:41 - app.config_loader - INFO - Configuration loaded successfully\nFile: /workspace/app/config_loader.py, Line: 18
+2026-08-20 06:21:41 - app.main - INFO - Configuration loaded successfully.\nFile: /workspace/app/main.py, Line: 66
+2026-08-20 06:21:41 - app.main - INFO - Database initialized.\nFile: /workspace/app/main.py, Line: 70
+2026-08-20 06:21:41 - app.main - INFO - Mailer service disabled in config.\nFile: /workspace/app/main.py, Line: 84
+2026-08-20 06:21:41 - app.services.collector - INFO - Инициализировано парсеров: 2\nFile: /workspace/app/services/collector.py, Line: 79
+2026-08-20 06:21:41 - apscheduler.scheduler - INFO - Scheduler started\nFile: /usr/local/lib/python3.12/site-packages/apscheduler/schedulers/base.py, Line: 181
+2026-08-20 06:21:41 - app.services.scheduler - INFO - SchedulerService started successfully.\nFile: /workspace/app/services/scheduler.py, Line: 17
+2026-08-20 06:21:41 - apscheduler.scheduler - INFO - Added job "Collection at 09:20" to job store "default"\nFile: /usr/local/lib/python3.12/site-packages/apscheduler/schedulers/base.py, Line: 895
+2026-08-20 06:21:41 - app.services.scheduler - INFO - Scheduled job 'daily_09_20' to run at 09:20\nFile: /workspace/app/services/scheduler.py, Line: 39
+2026-08-20 06:21:41 - apscheduler.scheduler - INFO - Added job "Collection at 14:20" to job store "default"\nFile: /usr/local/lib/python3.12/site-packages/apscheduler/schedulers/base.py, Line: 895
+2026-08-20 06:21:41 - app.services.scheduler - INFO - Scheduled job 'daily_14_20' to run at 14:20\nFile: /workspace/app/services/scheduler.py, Line: 39
+2026-08-20 06:21:41 - apscheduler.scheduler - INFO - Added job "Collection at 19:20" to job store "default"\nFile: /usr/local/lib/python3.12/site-packages/apscheduler/schedulers/base.py, Line: 895
+2026-08-20 06:21:41 - app.services.scheduler - INFO - Scheduled job 'daily_19_20' to run at 19:20\nFile: /workspace/app/services/scheduler.py, Line: 39
+2026-08-20 06:21:41 - app.main - INFO - Scheduled collection tasks: ['09:20', '14:20', '19:20']\nFile: /workspace/app/main.py, Line: 93
