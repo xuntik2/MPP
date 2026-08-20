@@ -109,7 +109,7 @@ def run_collection_task():
         db = SessionLocal()
         try:
             collector = Collector(config, db)
-            stats = collector.run_all()
+            stats = collector.run_collection()
             logger.info(f"Collection finished: {stats}")
         finally:
             db.close()
